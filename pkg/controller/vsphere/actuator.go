@@ -87,6 +87,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 		if val != scope.providerStatus.TaskRef {
 			if a.FailedProvStatusUpdate[machine.Name] != nil {
 				// Attempt to update previous status
+				klog.Infof("Attempting to re-patch machine  %s", machine.Name)
 				scope.providerStatus = a.FailedProvStatusUpdate[machine.Name]
 				if err := scope.PatchMachine(); err != nil {
 					// Ok, still not having any luck.  Let's just return the error and retry later
@@ -95,9 +96,10 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 					// Ok, this time update worked.  Clear out the failed patch info.
 					delete(a.FailedProvStatusUpdate, machine.Name)
 				}
+			} else {
+				klog.Errorf("%s: machine object missing expected provider task ID, requeue", machine.GetName())
+				return &machinecontroller.RequeueAfterError{RequeueAfter: requeueAfterSeconds * time.Second}
 			}
-			klog.Errorf("%s: machine object missing expected provider task ID, requeue", machine.GetName())
-			return &machinecontroller.RequeueAfterError{RequeueAfter: requeueAfterSeconds * time.Second}
 		}
 	}
 
